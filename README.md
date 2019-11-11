@@ -4,14 +4,15 @@ I created this module because of [a bug in meteor-collecton-hooks](https://githu
 
 ## Differences
 
+* Uses Observe to run the hooks
+* Is cluster aware
+* Does not block
 * No UserId passed to hooks
 * before hooks receive arguments passed to the matching mongodb method
 * after.insert hook receives one argument: document
 * after.remove hook receives one argument: document
 * after.update hook receives two arguments: current, previous
 * a `hookMeta` field is added to all documents (Which holds userId, hook uuid, timestamp, and direct)
-* Uses Observe to run the hooks
-* Is cluster aware
 * Collection.original.method holds the original method, Collection.direct.method sets direct to true in hookMeta, collection.method sets direct to false in hookMeta.
 
 ## Installation

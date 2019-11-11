@@ -3,7 +3,6 @@ import genUuid from 'uuid/v4'
 
 export const uuid = process.env.HOOKS_UUID || genUuid()
 export const name = 'hooks';
-export const Collections = {}
 
 class hook {
   constructor() {
@@ -127,7 +126,6 @@ const mutate = Parent => {
   const { Collection } = Parent
   Parent.Collection = function (name, ...args) {
     const collection = Collection.apply(this, [name, ...args])
-    Collections[name] = this
     setupHooks(this)
     setupObservers(this)
     return collection

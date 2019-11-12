@@ -28,7 +28,7 @@ const setupDirects = Instance => {
       Instance.original.insert(document, ...args)
     },
     update(selector, modifier, ...args) {
-      const hookMeta = getHookMeta(false)
+      const hookMeta = getHookMeta(true)
       modifier.$set = { ...modifier.$set, hookMeta }
       Instance.original.update(selector, modifier, ...args)
     },

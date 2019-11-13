@@ -78,13 +78,12 @@ const setupHooks = Instance => {
     document.hookMeta = getHookMeta(false)
     return Instance.original.insert(document, ...args)
   }
-  collection.remove = (document, ...args) => {
+  collection.remove = (...args) => {
     const abort = Instance.before.removeHooks
-      .map(hook => hook(document, ...args))
+      .map(hook => hook(...args))
       .some(result => result == false)
     if (abort) return
-    document.hookMeta = getHookMeta(false)
-    return Instance.original.insert(document, ...args)
+    return Instance.original.remove(...args)
   }
   collection.find = (...args) => {
     Instance.before.findHooks

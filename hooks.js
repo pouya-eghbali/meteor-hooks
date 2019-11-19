@@ -78,12 +78,18 @@ const setupHooks = Instance => {
     document.hookMeta = getHookMeta(false)
     return Instance.original.insert(document, ...args)
   }
-  collection.remove = (...args) => {
+  collection.remove = (query, ...args) => {
     const abort = Instance.before.removeHooks
-      .map(hook => hook(...args))
+      .map(hook => hook(query, ...args))
       .some(result => result == false)
     if (abort) return
-    return Instance.original.remove(...args)
+    const hookMeta = { ...getHookMeta(false), removed: true }
+    const $set = { hookMeta }
+    return Instance.original.update(query, { $set }, { multi: true }, (err, res) => {
+      if (err) throw err
+      query['hookMeta.removed'] = true
+      Instance.original.remove(query, ...args)
+    })
   }
   collection.find = (...args) => {
     Instance.before.findHooks
@@ -103,32 +109,36 @@ const setupHooks = Instance => {
   }
 }
 
+const checkMeta = ({ hookMeta: meta }, rejectRemoved = true) => {
+  return new Promise((resolve, reject) => {
+    if (meta == undefined) return reject()
+    if (meta.uuid != uuid) return reject()
+    if (meta.direct) return reject()
+    if (rejectRemoved && meta.remove) return reject()
+    resolve()
+  })
+}
+
+const doNothing = () => { }
+
 const setupObservers = Instance => {
+  const { insertHooks, updateHooks, removeHooks } = Instance.after
   Instance.observer = Instance.find({}).observe({
     added(document) {
-      if (!document.hookMeta) return
-      if (document.hookMeta.uuid != uuid) return
-      if (document.hookMeta.direct) return
-      else
-        Instance.after.insertHooks
-          .forEach(hook => hook(document))
+      if (Instance.observer)
+        checkMeta(document)
+          .then(() => insertHooks.forEach(hook => hook(document)))
+          .catch(doNothing)
     },
     removed(document) {
-      if (!document.hookMeta) return
-      if (document.hookMeta.uuid != uuid) return
-      // idk how to fix this atm
-      if (document.hookMeta.direct) return
-      else
-        Instance.after.removeHooks
-          .forEach(hook => hook(document))
+      checkMeta(document)
+        .then(() => removeHooks.forEach(hook => hook(document)))
+        .catch(doNothing)
     },
     changed(current, previous) {
-      if (!current.hookMeta) return
-      if (current.hookMeta.uuid != uuid) return
-      if (current.hookMeta.direct) return
-      else
-        Instance.after.updateHooks
-          .forEach(hook => hook(current, previous))
+      checkMeta(current, false)
+        .then(() => updateHooks.forEach(hook => hook(current, previous)))
+        .catch(doNothing)
     }
   })
 }

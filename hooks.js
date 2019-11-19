@@ -25,12 +25,12 @@ const setupDirects = Instance => {
   Instance.direct = {
     insert(document, ...args) {
       document.hookMeta = getHookMeta(true)
-      Instance.original.insert(document, ...args)
+      return Instance.original.insert(document, ...args)
     },
     update(selector, modifier, ...args) {
       const hookMeta = getHookMeta(true)
       modifier.$set = { ...modifier.$set, hookMeta }
-      Instance.original.update(selector, modifier, ...args)
+      return Instance.original.update(selector, modifier, ...args)
     },
     remove, find, findOne
   }
@@ -137,6 +137,7 @@ const mutate = Parent => {
   const { Collection } = Parent
   Parent.Collection = function (name, ...args) {
     const collection = Collection.apply(this, [name, ...args])
+    if (name == null) return collection
     setupHooks(this)
     setupObservers(this)
     return collection

@@ -104,19 +104,31 @@ const setupHooks = Instance => {
 }
 
 const setupObservers = Instance => {
-  const query = { 'hookMeta.uuid': uuid, 'hookMeta.direct': false }
-  Instance.observer = Instance.find(query).observe({
+  Instance.observer = Instance.find({}).observe({
     added(document) {
-      Instance.after.insertHooks
-        .forEach(hook => hook(document))
+      if (!document.hookMeta) return
+      if (document.hookMeta.uuid != uuid) return
+      if (document.hookMeta.direct) return
+      else
+        Instance.after.insertHooks
+          .forEach(hook => hook(document))
     },
     removed(document) {
-      Instance.after.removeHooks
-        .forEach(hook => hook(document))
+      if (!document.hookMeta) return
+      if (document.hookMeta.uuid != uuid) return
+      // idk how to fix this atm
+      if (document.hookMeta.direct) return
+      else
+        Instance.after.removeHooks
+          .forEach(hook => hook(document))
     },
     changed(current, previous) {
-      Instance.after.updateHooks
-        .forEach(hook => hook(current, previous))
+      if (!document.hookMeta) return
+      if (document.hookMeta.uuid != uuid) return
+      if (document.hookMeta.direct) return
+      else
+        Instance.after.updateHooks
+          .forEach(hook => hook(current, previous))
     }
   })
 }

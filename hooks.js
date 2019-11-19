@@ -123,9 +123,9 @@ const setupObservers = Instance => {
           .forEach(hook => hook(document))
     },
     changed(current, previous) {
-      if (!document.hookMeta) return
-      if (document.hookMeta.uuid != uuid) return
-      if (document.hookMeta.direct) return
+      if (!current.hookMeta) return
+      if (current.hookMeta.uuid != uuid) return
+      if (current.hookMeta.direct) return
       else
         Instance.after.updateHooks
           .forEach(hook => hook(current, previous))

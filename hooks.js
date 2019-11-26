@@ -19,6 +19,12 @@ class hook {
   find(fn) { this.findHooks.push(fn) }
 }
 
+const doNothing = () => { }
+
+const log = process.env.DEBUG == 'VERBOSE' ?
+  (name, message) => console.log(new Date(), `${name}: ${message}`) :
+  doNothing
+
 const setupDirects = Instance => {
   const { insert, update, remove, find, findOne } = Instance._collection
   Instance.original = { insert, update, remove, find, findOne }
@@ -114,12 +120,10 @@ const checkMeta = ({ hookMeta: meta }, rejectRemoved = true) => {
     if (meta == undefined) return reject()
     if (meta.uuid != uuid) return reject()
     if (meta.direct) return reject()
-    if (rejectRemoved && meta.remove) return reject()
+    if (rejectRemoved && meta.removed) return reject()
     resolve()
   })
 }
-
-const doNothing = () => { }
 
 const setupObservers = Instance => {
   const { insertHooks, updateHooks, removeHooks } = Instance.after
@@ -127,18 +131,21 @@ const setupObservers = Instance => {
     added(document) {
       if (Instance.observer)
         checkMeta(document)
+          .then(() => log(Instance._name, 'Running added hooks'))
           .then(() => insertHooks.forEach(hook => hook(document)))
-          .catch(doNothing)
+          .catch(e => log(Instance._name, e.message))
     },
     removed(document) {
       checkMeta(document)
+        .then(() => log(Instance._name, 'Running removed hooks'))
         .then(() => removeHooks.forEach(hook => hook(document)))
-        .catch(doNothing)
+        .catch(e => log(Instance._name, e.message))
     },
     changed(current, previous) {
       checkMeta(current, false)
+        .then(() => log(Instance._name, 'Running changed hooks'))
         .then(() => updateHooks.forEach(hook => hook(current, previous)))
-        .catch(doNothing)
+        .catch(e => log(Instance._name, e.message))
     }
   })
 }

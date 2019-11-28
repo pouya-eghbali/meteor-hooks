@@ -133,19 +133,19 @@ const setupObservers = Instance => {
         checkMeta(document)
           .then(() => log(Instance._name, 'Running added hooks'))
           .then(() => insertHooks.forEach(hook => hook(document)))
-          .catch(e => log(Instance._name, e.message))
+          .catch(e => log(Instance._name, e))
     },
     removed(document) {
       checkMeta(document)
         .then(() => log(Instance._name, 'Running removed hooks'))
         .then(() => removeHooks.forEach(hook => hook(document)))
-        .catch(e => log(Instance._name, e.message))
+        .catch(e => log(Instance._name, e))
     },
     changed(current, previous) {
       checkMeta(current, false)
         .then(() => log(Instance._name, 'Running changed hooks'))
         .then(() => updateHooks.forEach(hook => hook(current, previous)))
-        .catch(e => log(Instance._name, e.message))
+        .catch(e => log(Instance._name, e))
     }
   })
 }

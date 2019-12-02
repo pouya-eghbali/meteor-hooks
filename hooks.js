@@ -68,6 +68,7 @@ const setupHooks = Instance => {
   ensureDirect(Instance)
   const { _collection: collection } = Instance
   collection.update = (selector, modifier, ...args) => {
+    log(Instance._name, '[update] Collection method called')
     const abort = Instance.before.updateHooks
       .map(hook => hook(selector, modifier, ...args))
       .some(result => result == false)
@@ -77,6 +78,7 @@ const setupHooks = Instance => {
     return Instance.original.update(selector, modifier, ...args)
   }
   collection.insert = (document, ...args) => {
+    log(Instance._name, '[insert] Collection method called')
     const abort = Instance.before.insertHooks
       .map(hook => hook(document, ...args))
       .some(result => result == false)
@@ -85,6 +87,7 @@ const setupHooks = Instance => {
     return Instance.original.insert(document, ...args)
   }
   collection.remove = (query, ...args) => {
+    log(Instance._name, '[remove] Collection method called')
     const abort = Instance.before.removeHooks
       .map(hook => hook(query, ...args))
       .some(result => result == false)
@@ -98,6 +101,7 @@ const setupHooks = Instance => {
     })
   }
   collection.find = (...args) => {
+    log(Instance._name, '[find] Collection method called')
     Instance.before.findHooks
       .forEach(hook => hook(...args))
     const result = Instance.original.find(...args)
@@ -106,6 +110,7 @@ const setupHooks = Instance => {
     return result
   }
   collection.findOne = (...args) => {
+    log(Instance._name, '[findOne] Collection method called')
     Instance.before.findOneHooks
       .forEach(hook => hook(...args))
     const result = Instance.original.findOne(...args)
@@ -129,19 +134,22 @@ const setupObservers = Instance => {
   const { insertHooks, updateHooks, removeHooks } = Instance.after
   Instance.observer = Instance.find({}).observe({
     added(document) {
-      if (Instance.observer)
-        checkMeta(document)
-          .then(() => log(Instance._name, 'Running added hooks'))
-          .then(() => insertHooks.forEach(hook => hook(document)))
-          .catch(e => log(Instance._name, e))
+      if (!Instance.observer) return undefined
+      log(Instance._name, 'Checking added hook meta')
+      checkMeta(document)
+        .then(() => log(Instance._name, 'Running added hooks'))
+        .then(() => insertHooks.forEach(hook => hook(document)))
+        .catch(e => log(Instance._name, e))
     },
     removed(document) {
+      log(Instance._name, 'Checking removed hook meta')
       checkMeta(document)
         .then(() => log(Instance._name, 'Running removed hooks'))
         .then(() => removeHooks.forEach(hook => hook(document)))
         .catch(e => log(Instance._name, e))
     },
     changed(current, previous) {
+      log(Instance._name, 'Checking changed hook meta')
       checkMeta(current, false)
         .then(() => log(Instance._name, 'Running changed hooks'))
         .then(() => updateHooks.forEach(hook => hook(current, previous)))

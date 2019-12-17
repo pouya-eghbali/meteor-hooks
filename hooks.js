@@ -122,10 +122,10 @@ const setupHooks = Instance => {
 
 const checkMeta = ({ hookMeta: meta }, rejectRemoved = true) => {
   return new Promise((resolve, reject) => {
-    if (meta == undefined) return reject()
-    if (meta.uuid != uuid) return reject()
-    if (meta.direct) return reject()
-    if (rejectRemoved && meta.removed) return reject()
+    if (meta == undefined) return reject('No meta')
+    if (meta.uuid != uuid) return reject('UUID does not match')
+    if (meta.direct) return reject('Is direct')
+    if (rejectRemoved && meta.removed) return reject('Is removed')
     resolve()
   })
 }

@@ -158,14 +158,14 @@ const setupObservers = Instance => {
     },
     removed(document) {
       log(Instance._name, "Checking removed hook meta");
-      checkMeta(document)
+      checkMeta(document, false)
         .then(() => log(Instance._name, "Running removed hooks"))
         .then(() => removeHooks.forEach(hook => hook(document)))
         .catch(e => log(Instance._name, e));
     },
     changed(current, previous) {
       log(Instance._name, "Checking changed hook meta");
-      checkMeta(current, false)
+      checkMeta(current)
         .then(() => log(Instance._name, "Running changed hooks"))
         .then(() => updateHooks.forEach(hook => hook(current, previous)))
         .catch(e => log(Instance._name, e));

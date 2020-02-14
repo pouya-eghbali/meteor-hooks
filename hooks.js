@@ -193,5 +193,6 @@ if (Meteor.isServer) {
   mutate(Meteor);
   if (Meteor.users) {
     setupHooks(Meteor.users);
+    setupObservers(Meteor.users);
   }
 }

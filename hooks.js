@@ -1,4 +1,5 @@
 import { Mongo } from "meteor/mongo";
+import { Random } from "meteor/random";
 import genUuid from "uuid/v4";
 
 export const uuid = process.env.HOOKS_UUID || genUuid();
@@ -9,6 +10,7 @@ class hook {
     this.findOneHooks = [];
     this.insertHooks = [];
     this.updateHooks = [];
+    this.upsertHooks = [];
     this.removeHooks = [];
     this.findHooks = [];
   }
@@ -20,6 +22,9 @@ class hook {
   }
   update(fn) {
     this.updateHooks.push(fn);
+  }
+  upsert(fn) {
+    this.upsertHooks.push(fn);
   }
   remove(fn) {
     this.removeHooks.push(fn);
@@ -37,17 +42,30 @@ const log =
     : doNothing;
 
 const setupDirects = Instance => {
-  const { insert, update, remove, find, findOne } = Instance._collection;
-  Instance.original = { insert, update, remove, find, findOne };
+  const {
+    insert,
+    update,
+    upsert,
+    remove,
+    find,
+    findOne
+  } = Instance._collection;
+  Instance.original = { insert, update, upsert, remove, find, findOne };
   Instance.direct = {
     insert(document, ...args) {
-      document.hookMeta = getHookMeta(true);
+      document.hookMeta = getHookMeta("insert", true);
       return Instance.original.insert(document, ...args);
     },
     update(selector, modifier, ...args) {
-      const hookMeta = getHookMeta(true);
+      const hookMeta = getHookMeta("update", true);
       modifier.$set = { ...modifier.$set, hookMeta };
       return Instance.original.update(selector, modifier, ...args);
+    },
+    upsert(selector, modifier, ...args) {
+      const hookMeta = getHookMeta("upsert", true);
+      modifier.$set = { ...modifier.$set, hookMeta };
+      modifier.$setOnInsert = { _id: Random.id() };
+      return Instance.original.upsert(selector, modifier, ...args);
     },
     remove,
     find,
@@ -69,12 +87,13 @@ const silence = fn => {
 
 const getUserId = () => silence(Meteor.userId);
 
-const getHookMeta = direct => {
+const getHookMeta = (method, direct) => {
   return {
     timestamp: new Date(),
     userId: getUserId(),
     uuid,
-    direct
+    direct,
+    method
   };
 };
 
@@ -89,9 +108,20 @@ const setupHooks = Instance => {
       .map(hook => hook(selector, modifier, ...args))
       .some(result => result == false);
     if (abort) return;
-    const hookMeta = getHookMeta(false);
+    const hookMeta = getHookMeta("update", false);
     modifier.$set = { ...modifier.$set, hookMeta };
     return Instance.original.update(selector, modifier, ...args);
+  };
+  collection.upsert = (selector, modifier, ...args) => {
+    log(Instance._name, "[upsert] Collection method called");
+    const abort = Instance.before.upsertHooks
+      .map(hook => hook(selector, modifier, ...args))
+      .some(result => result == false);
+    if (abort) return;
+    const hookMeta = getHookMeta("upsert", false);
+    modifier.$set = { ...modifier.$set, hookMeta };
+    modifier.$setOnInsert = { _id: Random.id() };
+    return Instance.original.upsert(selector, modifier, ...args);
   };
   collection.insert = (document, ...args) => {
     log(Instance._name, "[insert] Collection method called");
@@ -99,7 +129,7 @@ const setupHooks = Instance => {
       .map(hook => hook(document, ...args))
       .some(result => result == false);
     if (abort) return;
-    document.hookMeta = getHookMeta(false);
+    document.hookMeta = getHookMeta("insert", false);
     return Instance.original.insert(document, ...args);
   };
   collection.remove = (query, ...args) => {
@@ -108,7 +138,7 @@ const setupHooks = Instance => {
       .map(hook => hook(query, ...args))
       .some(result => result == false);
     if (abort) return;
-    const hookMeta = { ...getHookMeta(false), removed: true };
+    const hookMeta = { ...getHookMeta("remove", false), removed: true };
     const $set = { hookMeta };
     return new Promise((resolve, reject) => {
       Instance.original.update(query, { $set }, { multi: true }, (err, res) => {
@@ -146,14 +176,18 @@ const checkMeta = ({ hookMeta: meta }, rejectRemoved = true) => {
 };
 
 const setupObservers = Instance => {
-  const { insertHooks, updateHooks, removeHooks } = Instance.after;
+  const { insertHooks, updateHooks, upsertHooks, removeHooks } = Instance.after;
   Instance.observer = Instance.find({}).observe({
     added(document) {
       if (!Instance.observer) return undefined;
       log(Instance._name, "Checking added hook meta");
       checkMeta(document)
         .then(() => log(Instance._name, "Running added hooks"))
-        .then(() => insertHooks.forEach(hook => hook(document)))
+        .then(() => {
+          const hooks =
+            document.hookMeta.method == "upsert" ? upsertHooks : insertHooks;
+          hooks.forEach(hook => hook(document));
+        })
         .catch(e => log(Instance._name, e));
     },
     removed(document) {
@@ -167,7 +201,11 @@ const setupObservers = Instance => {
       log(Instance._name, "Checking changed hook meta");
       checkMeta(current)
         .then(() => log(Instance._name, "Running changed hooks"))
-        .then(() => updateHooks.forEach(hook => hook(current, previous)))
+        .then(() => {
+          const hooks =
+            current.hookMeta.method == "upsert" ? upsertHooks : updateHooks;
+          hooks.forEach(hook => hook(current, previous));
+        })
         .catch(e => log(Instance._name, e));
     }
   });

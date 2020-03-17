@@ -3,6 +3,9 @@ import { Random } from "meteor/random";
 import genUuid from "uuid/v4";
 
 export const uuid = process.env.HOOKS_UUID || genUuid();
+export const interval = process.env.HOOKS_INTERVAL
+  ? Number(process.env.HOOKS_INTERVAL)
+  : 1000 * 60 * 1; // every 1 minute
 export const name = "hooks";
 
 class hook {
@@ -176,39 +179,53 @@ const checkMeta = ({ hookMeta: meta }, rejectRemoved = true) => {
 };
 
 const setupObservers = Instance => {
-  const { insertHooks, updateHooks, upsertHooks, removeHooks } = Instance.after;
-  Instance.observer = Instance.find({}).observe({
-    added(document) {
-      if (!Instance.observer) return undefined;
-      log(Instance._name, "Checking added hook meta");
-      checkMeta(document)
-        .then(() => log(Instance._name, "Running added hooks"))
-        .then(() => {
-          const hooks =
-            document.hookMeta.method == "upsert" ? upsertHooks : insertHooks;
-          hooks.forEach(hook => hook(document));
-        })
-        .catch(e => log(Instance._name, e));
-    },
-    removed(document) {
-      log(Instance._name, "Checking removed hook meta");
-      checkMeta(document, false)
-        .then(() => log(Instance._name, "Running removed hooks"))
-        .then(() => removeHooks.forEach(hook => hook(document)))
-        .catch(e => log(Instance._name, e));
-    },
-    changed(current, previous) {
-      log(Instance._name, "Checking changed hook meta");
-      checkMeta(current)
-        .then(() => log(Instance._name, "Running changed hooks"))
-        .then(() => {
-          const hooks =
-            current.hookMeta.method == "upsert" ? upsertHooks : updateHooks;
-          hooks.forEach(hook => hook(current, previous));
-        })
-        .catch(e => log(Instance._name, e));
-    }
-  });
+  if (Meteor.isServer) {
+    const {
+      insertHooks,
+      updateHooks,
+      upsertHooks,
+      removeHooks
+    } = Instance.after;
+    Instance.lastHookRun = new Date();
+    Instance.interval =
+      Instance.interval ||
+      Meteor.setInterval(function() {
+        log(Instance._name, "Running hooks");
+        const { lastHookRun } = Instance;
+        Instance.lastHookRun = new Date();
+        const query = method => ({
+          "hookMeta.uuid": uuid,
+          "hookMeta.method": method,
+          "hookMeta.timestamp": { $gt: lastHookRun }
+        });
+        Instance.find(query("insert")).forEach(document => {
+          log(Instance._name, "Checking added hook meta");
+          checkMeta(document)
+            .then(() => log(Instance._name, "Running insert hooks"))
+            .then(() => insertHooks.forEach(hook => hook(document)))
+            .catch(e => log(Instance._name, e));
+        });
+        Instance.find(query("update")).forEach(document => {
+          checkMeta(document)
+            .then(() => log(Instance._name, "Running update hooks"))
+            .then(() => updateHooks.forEach(hook => hook(document)))
+            .catch(e => log(Instance._name, e));
+        });
+        Instance.find(query("upsert")).forEach(document => {
+          checkMeta(document)
+            .then(() => log(Instance._name, "Running upsert hooks"))
+            .then(() => upsertHooks.forEach(hook => hook(document)))
+            .catch(e => log(Instance._name, e));
+        });
+        // this won't work, I need to fix this
+        Instance.find(query("remove")).forEach(document => {
+          checkMeta(document)
+            .then(() => log(Instance._name, "Running remove hooks"))
+            .then(() => removeHooks.forEach(hook => hook(document)))
+            .catch(e => log(Instance._name, e));
+        });
+      }, interval);
+  }
 };
 
 const mutate = Parent => {

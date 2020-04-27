@@ -44,14 +44,14 @@ const log =
     ? (name, message) => console.log(new Date(), `${name}: ${message}`)
     : doNothing;
 
-const setupDirects = Instance => {
+const setupDirects = (Instance) => {
   const {
     insert,
     update,
     upsert,
     remove,
     find,
-    findOne
+    findOne,
   } = Instance._collection;
   Instance.original = { insert, update, upsert, remove, find, findOne };
   Instance.direct = {
@@ -72,17 +72,17 @@ const setupDirects = Instance => {
     },
     remove,
     find,
-    findOne
+    findOne,
   };
 };
 
-const ensureDirect = Instance => {
+const ensureDirect = (Instance) => {
   if (!Instance.direct) {
     setupDirects(Instance);
   }
 };
 
-const silence = fn => {
+const silence = (fn) => {
   try {
     return fn();
   } catch (error) {}
@@ -96,11 +96,11 @@ const getHookMeta = (method, direct) => {
     userId: getUserId(),
     uuid,
     direct,
-    method
+    method,
   };
 };
 
-const setupHooks = Instance => {
+const setupHooks = (Instance) => {
   Instance.after = new hook();
   Instance.before = new hook();
   ensureDirect(Instance);
@@ -108,8 +108,8 @@ const setupHooks = Instance => {
   collection.update = (selector, modifier, ...args) => {
     log(Instance._name, "[update] Collection method called");
     const abort = Instance.before.updateHooks
-      .map(hook => hook(selector, modifier, ...args))
-      .some(result => result == false);
+      .map((hook) => hook(selector, modifier, ...args))
+      .some((result) => result == false);
     if (abort) return;
     const hookMeta = getHookMeta("update", false);
     modifier.$set = { ...modifier.$set, hookMeta };
@@ -118,8 +118,8 @@ const setupHooks = Instance => {
   collection.upsert = (selector, modifier, ...args) => {
     log(Instance._name, "[upsert] Collection method called");
     const abort = Instance.before.upsertHooks
-      .map(hook => hook(selector, modifier, ...args))
-      .some(result => result == false);
+      .map((hook) => hook(selector, modifier, ...args))
+      .some((result) => result == false);
     if (abort) return;
     const hookMeta = getHookMeta("upsert", false);
     modifier.$set = { ...modifier.$set, hookMeta };
@@ -129,8 +129,8 @@ const setupHooks = Instance => {
   collection.insert = (document, ...args) => {
     log(Instance._name, "[insert] Collection method called");
     const abort = Instance.before.insertHooks
-      .map(hook => hook(document, ...args))
-      .some(result => result == false);
+      .map((hook) => hook(document, ...args))
+      .some((result) => result == false);
     if (abort) return;
     document.hookMeta = getHookMeta("insert", false);
     return Instance.original.insert(document, ...args);
@@ -138,8 +138,8 @@ const setupHooks = Instance => {
   collection.remove = (query, ...args) => {
     log(Instance._name, "[remove] Collection method called");
     const abort = Instance.before.removeHooks
-      .map(hook => hook(query, ...args))
-      .some(result => result == false);
+      .map((hook) => hook(query, ...args))
+      .some((result) => result == false);
     if (abort) return;
     const hookMeta = { ...getHookMeta("remove", false), removed: true };
     const $set = { hookMeta };
@@ -154,16 +154,16 @@ const setupHooks = Instance => {
   };
   collection.find = (...args) => {
     log(Instance._name, "[find] Collection method called");
-    Instance.before.findHooks.forEach(hook => hook(...args));
+    Instance.before.findHooks.forEach((hook) => hook(...args));
     const result = Instance.original.find(...args);
-    Instance.after.findHooks.forEach(hook => hook(result));
+    Instance.after.findHooks.forEach((hook) => hook(result));
     return result;
   };
   collection.findOne = (...args) => {
     log(Instance._name, "[findOne] Collection method called");
-    Instance.before.findOneHooks.forEach(hook => hook(...args));
+    Instance.before.findOneHooks.forEach((hook) => hook(...args));
     const result = Instance.original.findOne(...args);
-    Instance.after.findOneHooks.forEach(hook => hook(result));
+    Instance.after.findOneHooks.forEach((hook) => hook(result));
     return result;
   };
 };
@@ -178,59 +178,59 @@ const checkMeta = ({ hookMeta: meta }, rejectRemoved = true) => {
   });
 };
 
-const setupObservers = Instance => {
+const setupObservers = (Instance) => {
   if (Meteor.isServer) {
     const {
       insertHooks,
       updateHooks,
       upsertHooks,
-      removeHooks
+      removeHooks,
     } = Instance.after;
     Instance.lastHookRun = new Date();
     Instance.interval =
       Instance.interval ||
-      Meteor.setInterval(function() {
+      Meteor.setInterval(function () {
         log(Instance._name, "Running hooks");
         const { lastHookRun } = Instance;
         Instance.lastHookRun = new Date();
-        const query = method => ({
+        const query = (method) => ({
           "hookMeta.uuid": uuid,
           "hookMeta.method": method,
-          "hookMeta.timestamp": { $gt: lastHookRun }
+          "hookMeta.timestamp": { $gt: lastHookRun },
         });
-        Instance.find(query("insert")).forEach(document => {
+        Instance.find(query("insert")).forEach((document) => {
           log(Instance._name, "Checking added hook meta");
           checkMeta(document)
             .then(() => log(Instance._name, "Running insert hooks"))
-            .then(() => insertHooks.forEach(hook => hook(document)))
-            .catch(e => log(Instance._name, e));
+            .then(() => insertHooks.forEach((hook) => hook(document)))
+            .catch((e) => log(Instance._name, e));
         });
-        Instance.find(query("update")).forEach(document => {
+        Instance.find(query("update")).forEach((document) => {
           checkMeta(document)
             .then(() => log(Instance._name, "Running update hooks"))
-            .then(() => updateHooks.forEach(hook => hook(document)))
-            .catch(e => log(Instance._name, e));
+            .then(() => updateHooks.forEach((hook) => hook(document)))
+            .catch((e) => log(Instance._name, e));
         });
-        Instance.find(query("upsert")).forEach(document => {
+        Instance.find(query("upsert")).forEach((document) => {
           checkMeta(document)
             .then(() => log(Instance._name, "Running upsert hooks"))
-            .then(() => upsertHooks.forEach(hook => hook(document)))
-            .catch(e => log(Instance._name, e));
+            .then(() => upsertHooks.forEach((hook) => hook(document)))
+            .catch((e) => log(Instance._name, e));
         });
         // this won't work, I need to fix this
-        Instance.find(query("remove")).forEach(document => {
+        Instance.find(query("remove")).forEach((document) => {
           checkMeta(document)
             .then(() => log(Instance._name, "Running remove hooks"))
-            .then(() => removeHooks.forEach(hook => hook(document)))
-            .catch(e => log(Instance._name, e));
+            .then(() => removeHooks.forEach((hook) => hook(document)))
+            .catch((e) => log(Instance._name, e));
         });
       }, interval);
   }
 };
 
-const mutate = Parent => {
+const mutate = (Parent) => {
   const { Collection } = Parent;
-  Parent.Collection = function(name, ...args) {
+  Parent.Collection = function (name, ...args) {
     const collection = Collection.apply(this, [name, ...args]);
     if (name == null) return collection;
     setupHooks(this);

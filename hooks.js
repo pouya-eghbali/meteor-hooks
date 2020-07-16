@@ -141,15 +141,13 @@ const setupHooks = (Instance) => {
       .map((hook) => hook(query, ...args))
       .some((result) => result == false);
     if (abort) return;
-    const hookMeta = { ...getHookMeta("remove", false), removed: true };
-    const $set = { hookMeta };
+    //const hookMeta = { ...getHookMeta("remove", false), removed: true };
+    //const $set = { hookMeta };
     return new Promise((resolve, reject) => {
-      Instance.original.update(query, { $set }, { multi: true }, (err, res) => {
-        if (err) reject(error);
-        query["hookMeta.removed"] = true;
-        const result = Instance.original.remove(query, ...args);
-        resolve(result);
-      });
+      const removed = Instance.original.find(query).fetch();
+      const result = Instance.original.remove(query, ...args);
+      Instance.after.removeHooks.map((hook) => hook(removed, query, ...args));
+      resolve(result);
     });
   };
   collection.find = (...args) => {

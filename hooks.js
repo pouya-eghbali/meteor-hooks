@@ -105,7 +105,7 @@ const setupHooks = (Instance) => {
   Instance.before = new hook();
   ensureDirect(Instance);
   const { _collection: collection } = Instance;
-  collection.update = (selector, modifier, ...args) => {
+  collection.update = async (selector, modifier, ...args) => {
     log(Instance._name, "[update] Collection method called");
     const abort = Instance.before.updateHooks
       .map((hook) => hook(selector, modifier, ...args))
@@ -113,7 +113,11 @@ const setupHooks = (Instance) => {
     if (abort) return;
     const hookMeta = getHookMeta("update", false);
     modifier.$set = { ...modifier.$set, hookMeta };
-    return Instance.original.update(selector, modifier, ...args);
+    try {
+      return Instance.original.update(selector, modifier, ...args);
+    } catch (error) {
+      throw new Meteor.Error(500, error.message);
+    }
   };
   collection.upsert = (selector, modifier, ...args) => {
     log(Instance._name, "[upsert] Collection method called");
@@ -126,7 +130,7 @@ const setupHooks = (Instance) => {
     modifier.$setOnInsert = { _id: Random.id() };
     return Instance.original.upsert(selector, modifier, ...args);
   };
-  collection.insert = (document, ...args) => {
+  collection.insert = async (document, ...args) => {
     log(Instance._name, "[insert] Collection method called");
     const abort = Instance.before.insertHooks
       .map((hook) => hook(document, ...args))

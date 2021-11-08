@@ -45,14 +45,8 @@ const log =
     : doNothing;
 
 const setupDirects = (Instance) => {
-  const {
-    insert,
-    update,
-    upsert,
-    remove,
-    find,
-    findOne,
-  } = Instance._collection;
+  const { insert, update, upsert, remove, find, findOne } =
+    Instance._collection;
   Instance.original = { insert, update, upsert, remove, find, findOne };
   Instance.direct = {
     insert(document, ...args) {
@@ -85,7 +79,9 @@ const ensureDirect = (Instance) => {
 const silence = (fn) => {
   try {
     return fn();
-  } catch (error) {}
+  } catch (error) {
+    // Do nothing
+  }
 };
 
 const getUserId = () => silence(Meteor.userId);
@@ -105,7 +101,7 @@ const setupHooks = (Instance) => {
   Instance.before = new hook();
   ensureDirect(Instance);
   const { _collection: collection } = Instance;
-  collection.update = async (selector, modifier, ...args) => {
+  collection.update = (selector, modifier, ...args) => {
     log(Instance._name, "[update] Collection method called");
     const abort = Instance.before.updateHooks
       .map((hook) => hook(selector, modifier, ...args))
@@ -130,7 +126,7 @@ const setupHooks = (Instance) => {
     modifier.$setOnInsert = { _id: Random.id() };
     return Instance.original.upsert(selector, modifier, ...args);
   };
-  collection.insert = async (document, ...args) => {
+  collection.insert = (document, ...args) => {
     log(Instance._name, "[insert] Collection method called");
     const abort = Instance.before.insertHooks
       .map((hook) => hook(document, ...args))
@@ -145,14 +141,10 @@ const setupHooks = (Instance) => {
       .map((hook) => hook(query, ...args))
       .some((result) => result == false);
     if (abort) return;
-    //const hookMeta = { ...getHookMeta("remove", false), removed: true };
-    //const $set = { hookMeta };
-    return new Promise((resolve, reject) => {
-      const removed = Instance.original.find(query).fetch();
-      const result = Instance.original.remove(query, ...args);
-      Instance.after.removeHooks.map((hook) => hook(removed, query, ...args));
-      resolve(result);
-    });
+    const removed = Instance.original.find(query).fetch();
+    const result = Instance.original.remove(query, ...args);
+    Instance.after.removeHooks.map((hook) => hook(removed, query, ...args));
+    return result;
   };
   collection.find = (...args) => {
     log(Instance._name, "[find] Collection method called");
@@ -182,12 +174,8 @@ const checkMeta = ({ hookMeta: meta }, rejectRemoved = true) => {
 
 const setupObservers = (Instance) => {
   if (Meteor.isServer) {
-    const {
-      insertHooks,
-      updateHooks,
-      upsertHooks,
-      removeHooks,
-    } = Instance.after;
+    const { insertHooks, updateHooks, upsertHooks, removeHooks } =
+      Instance.after;
     Instance.lastHookRun = new Date();
     Instance.interval =
       Instance.interval ||
